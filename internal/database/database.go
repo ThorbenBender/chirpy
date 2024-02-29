@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"sync"
 )
 
+var ErrNotExist = errors.New("Resource does not exist")
 
 type DB struct {
   path string
@@ -85,6 +86,18 @@ func (db *DB) GetChirps() ([]Chirp, error) {
     chirps = append(chirps, chirp)
   }
   return chirps, nil
+}
+
+func (db *DB) GetChirp(id int) (Chirp, error) {
+  dbStructure, err := db.loadDB()
+  if err != nil {
+    return Chirp{}, err
+  }
+  chirp, ok := dbStructure.Chirps[id]
+  if !ok {
+    return Chirp{}, ErrNotExist
+  }
+  return chirp, nil
 }
 
 func (db *DB) CreateChirp(body string) (Chirp, error) {
