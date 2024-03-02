@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
 
 	"github.com/thorbenbender/chirpy/internal/database"
 )
@@ -16,9 +18,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	godotenv.Load()
+	jwtSecret := os.Getenv("JWT_SECRET")
 	apiCfg := apiConfig{
 		fileServerHits: 0,
 		DB:             db,
+		JWTSecret:      jwtSecret,
 	}
 	router := chi.NewRouter()
 	fsHandler := apiCfg.middlewareMetricsInc(
@@ -35,6 +41,7 @@ func main() {
 	apiRouter.Get("/chirps/{id}", apiCfg.handlerChirpRetrieve)
 	apiRouter.Post("/users", apiCfg.handleUserCreate)
 	apiRouter.Post("/login", apiCfg.handleUserLogin)
+	apiRouter.Put("/users", apiCfg.handlerUserUpdate)
 
 	adminRouter := chi.NewRouter()
 	adminRouter.Get("/metrics", apiCfg.handleMetrics)
