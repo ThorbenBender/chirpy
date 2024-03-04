@@ -21,10 +21,12 @@ func main() {
 
 	godotenv.Load()
 	jwtSecret := os.Getenv("JWT_SECRET")
+	polkaApiKey := os.Getenv("POLKA_API_KEY")
 	apiCfg := apiConfig{
 		fileServerHits: 0,
 		DB:             db,
 		JWTSecret:      jwtSecret,
+		ApiKey:         polkaApiKey,
 	}
 	router := chi.NewRouter()
 	fsHandler := apiCfg.middlewareMetricsInc(
@@ -39,9 +41,13 @@ func main() {
 	apiRouter.Post("/chirps", apiCfg.handlerChirpsCreate)
 	apiRouter.Get("/chirps", apiCfg.handlerChirpsRetrieve)
 	apiRouter.Get("/chirps/{id}", apiCfg.handlerChirpRetrieve)
+	apiRouter.Delete("/chirps/{id}", apiCfg.handlerChirpDelete)
 	apiRouter.Post("/users", apiCfg.handleUserCreate)
 	apiRouter.Post("/login", apiCfg.handleUserLogin)
 	apiRouter.Put("/users", apiCfg.handlerUserUpdate)
+	apiRouter.Post("/refresh", apiCfg.HandleTokenRefresh)
+	apiRouter.Post("/revoke", apiCfg.HandleTokenRevoke)
+	apiRouter.Post("/polka/webhooks", apiCfg.HandlePolkaWebhook)
 
 	adminRouter := chi.NewRouter()
 	adminRouter.Get("/metrics", apiCfg.handleMetrics)

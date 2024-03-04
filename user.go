@@ -2,24 +2,23 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
-
 	"github.com/thorbenbender/chirpy/internal/auth"
 )
 
-type authResponse struct {
-	Email string `json:"email"`
-	ID    int    `json:"id"`
-	Token string `json:"token"`
+type User struct {
+	Email       string `json:"email"`
+	ID          int    `json:"id"`
+	IsChirpyRed bool   `json:"is_chirpy_red"`
 }
-type userResponse struct {
-	Email string `json:"email"`
-	ID    int    `json:"id"`
+
+type authResponse struct {
+	User
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 func (cfg *apiConfig) handleUserCreate(w http.ResponseWriter, r *http.Request) {
@@ -46,17 +45,17 @@ func (cfg *apiConfig) handleUserCreate(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Could not create user")
 		return
 	}
-	respondWithJson(w, http.StatusCreated, userResponse{
-		Email: user.Email,
-		ID:    user.ID,
+	respondWithJson(w, http.StatusCreated, User{
+		Email:       user.Email,
+		ID:          user.ID,
+		IsChirpyRed: user.IsChirpyRed,
 	})
 }
 
 func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email            string `json:"email"`
-		Password         string `json:"password"`
-		ExpiresInSeconds int    `json:"expires_in_seconds"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
@@ -72,23 +71,30 @@ func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Wrong password")
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer:   "chirpy",
-		IssuedAt: jwt.NewNumericDate(time.Now().UTC()),
-		ExpiresAt: jwt.NewNumericDate(
-			time.Now().UTC().Add(time.Duration(params.ExpiresInSeconds) * time.Second),
-		),
-		Subject: strconv.Itoa(user.ID),
-	})
-	authToken, err := token.SignedString([]byte(cfg.JWTSecret))
+
+	accessToken, err := auth.MakeJWT(user.ID, cfg.JWTSecret, time.Hour, auth.TokenTypeAccess)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldnt craete auth token")
-		return
+		respondWithError(w, http.StatusInternalServerError, "Couldnt create access JWT")
 	}
+
+	refreshToken, err := auth.MakeJWT(
+		user.ID,
+		cfg.JWTSecret,
+		time.Hour*24*30*6,
+		auth.TokenTypeRefresh,
+	)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldnt create refresh JWT")
+	}
+
 	respondWithJson(w, http.StatusOK, authResponse{
-		Token: authToken,
-		ID:    user.ID,
-		Email: user.Email,
+		User: User{
+			ID:          user.ID,
+			Email:       user.Email,
+			IsChirpyRed: user.IsChirpyRed,
+		},
+		Token:        accessToken,
+		RefreshToken: refreshToken,
 	})
 }
 
@@ -97,17 +103,17 @@ func (cfg *apiConfig) handlerUserUpdate(w http.ResponseWriter, r *http.Request) 
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	token, err := auth.GetBearerToken(r.Header)
+	token, err := auth.GetBearerToken(r.Header, "Bearer")
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Couldnt find jwt")
 		return
 	}
 	subject, err := auth.ValidateJWT(token, cfg.JWTSecret)
-	fmt.Println(err)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Couldnt validate JWT")
 		return
 	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
 	err = decoder.Decode(&params)
@@ -129,8 +135,9 @@ func (cfg *apiConfig) handlerUserUpdate(w http.ResponseWriter, r *http.Request) 
 		respondWithError(w, http.StatusInternalServerError, "Couldnt update user")
 		return
 	}
-	respondWithJson(w, http.StatusOK, userResponse{
-		ID:    user.ID,
-		Email: user.Email,
+	respondWithJson(w, http.StatusOK, User{
+		ID:          user.ID,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
 	})
 }

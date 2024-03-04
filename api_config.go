@@ -11,6 +11,7 @@ type apiConfig struct {
 	fileServerHits int
 	DB             *database.DB
 	JWTSecret      string
+	ApiKey         string
 }
 
 func (cfg *apiConfig) handleMetrics(w http.ResponseWriter, r *http.Request) {
