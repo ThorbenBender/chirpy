@@ -28,17 +28,29 @@ func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, r *http.Reque
 		authorID, err := strconv.Atoi(authorIDString)
 		if err != nil {
 			respondWithError(w, http.StatusBadRequest, "Couldnt parse author id")
+			return
 		}
 		dbChirps, err := cfg.DB.GetAuthorChirps(authorID)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Couldnt get chirps")
+			return
 		}
 		chirps = dbChirps
 	}
+	orderBy := "asc"
+
+	orderByParam := r.URL.Query().Get("sort")
+	if orderByParam == "desc" {
+		orderBy = "desc"
+	}
 
 	sort.Slice(chirps, func(i, j int) bool {
+		if orderBy == "desc" {
+			return chirps[i].ID > chirps[j].ID
+		}
 		return chirps[i].ID < chirps[j].ID
 	})
+
 	respondWithJson(w, http.StatusOK, chirps)
 }
 

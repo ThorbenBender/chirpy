@@ -4,8 +4,8 @@
 
 ```json
 {
-    "id": int
-    "email": string
+    "id": 1
+    "email": "email@gmail.com"
     "age": 11
 }
 ```
